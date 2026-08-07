@@ -42,14 +42,54 @@ function fmtDateTime(iso) {
 }
 
 /* ============================================
-   Session Storage
+   Session Storage — SQLite via local API
+   Falls back to localStorage if server is down
    ============================================ */
 const Sessions = {
-  KEY: 'codecure_v1_sessions',
-  all()    { return JSON.parse(localStorage.getItem(this.KEY) ?? '[]'); },
-  add(s)   { s.id = Date.now(); s.ts = new Date().toISOString(); const a = this.all(); a.unshift(s); localStorage.setItem(this.KEY, JSON.stringify(a)); return s; },
-  remove(id){ localStorage.setItem(this.KEY, JSON.stringify(this.all().filter(s => s.id !== id))); },
-  clear()  { localStorage.removeItem(this.KEY); }
+  async all() {
+    try {
+      const r = await fetch('/api/sessions');
+      if (!r.ok) throw new Error();
+      return await r.json();
+    } catch {
+      return JSON.parse(localStorage.getItem('codecure_v1_sessions') ?? '[]');
+    }
+  },
+
+  async add(s) {
+    try {
+      const r = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(s)
+      });
+      if (!r.ok) throw new Error();
+      return await r.json();
+    } catch {
+      s.id = Date.now(); s.ts = new Date().toISOString();
+      const a = JSON.parse(localStorage.getItem('codecure_v1_sessions') ?? '[]');
+      a.unshift(s);
+      localStorage.setItem('codecure_v1_sessions', JSON.stringify(a));
+      return s;
+    }
+  },
+
+  async remove(id) {
+    try {
+      await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+    } catch {
+      const a = JSON.parse(localStorage.getItem('codecure_v1_sessions') ?? '[]');
+      localStorage.setItem('codecure_v1_sessions', JSON.stringify(a.filter(s => s.id !== id)));
+    }
+  },
+
+  async clear() {
+    try {
+      await fetch('/api/sessions', { method: 'DELETE' });
+    } catch {
+      localStorage.removeItem('codecure_v1_sessions');
+    }
+  }
 };
 
 /* ============================================
@@ -156,8 +196,8 @@ const app = {
   /* ---- Init ---- */
   async init() {
     Charts.init();
-    this.refreshSidebarStats();
-    this.renderSessionsTable();
+    await this.refreshSidebarStats();
+    await this.renderSessionsTable();
     await this._doRefresh();
     // Auto-refresh every 15 s matching ESP32 upload cadence
     this._autoRefresh = setInterval(() => this._doRefresh(), 15000);
@@ -375,7 +415,7 @@ const app = {
   saveSession() {
     if (!this._lastResult) return;
 
-    Sessions.add({
+    await Sessions.add({
       name:      document.getElementById('patientName').value.trim(),
       age:       document.getElementById('patientAge').value       || '--',
       gender:    document.getElementById('patientGender').value    || '--',
@@ -386,8 +426,8 @@ const app = {
       status:    this._lastResult.status
     });
 
-    this.renderSessionsTable();
-    this.refreshSidebarStats();
+    await this.renderSessionsTable();
+    await this.refreshSidebarStats();
 
     const saveBtn = document.getElementById('saveBtn');
     saveBtn.textContent = '✓ SAVED';
@@ -409,8 +449,8 @@ const app = {
   },
 
   /* ---- Sessions Table ---- */
-  renderSessionsTable() {
-    let list = Sessions.all();
+  async renderSessionsTable() {
+    let list = await Sessions.all();
 
     const search  = (document.getElementById('searchInput')?.value ?? '').toLowerCase();
     const stFilter = document.getElementById('statusFilter')?.value ?? '';
@@ -439,21 +479,21 @@ const app = {
 
   filterSessions() { this.renderSessionsTable(); },
 
-  deleteSession(id) {
-    Sessions.remove(id);
-    this.renderSessionsTable();
-    this.refreshSidebarStats();
+  async deleteSession(id) {
+    await Sessions.remove(id);
+    await this.renderSessionsTable();
+    await this.refreshSidebarStats();
   },
 
-  clearAllSessions() {
+  async clearAllSessions() {
     if (!confirm('Delete all session records? This cannot be undone.')) return;
-    Sessions.clear();
-    this.renderSessionsTable();
-    this.refreshSidebarStats();
+    await Sessions.clear();
+    await this.renderSessionsTable();
+    await this.refreshSidebarStats();
   },
 
-  exportCSV() {
-    const list = Sessions.all();
+  async exportCSV() {
+    const list = await Sessions.all();
     if (!list.length) return;
 
     const header = ['#','Date/Time','Name','Age','Gender','Blood','BPM','Status','Complaint','History'];
@@ -473,8 +513,8 @@ const app = {
     URL.revokeObjectURL(a.href);
   },
 
-  refreshSidebarStats() {
-    const all    = Sessions.all();
+  async refreshSidebarStats() {
+    const all    = await Sessions.all();
     const today  = new Date().toDateString();
     const tod    = all.filter(s => new Date(s.ts).toDateString() === today);
 
