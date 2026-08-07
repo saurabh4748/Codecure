@@ -1,0 +1,13 @@
+{
+  "name": "codecure-dashboard",
+  "version": "1.0.0",
+  "description": "CodeCure AI Triage System - Local Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "npx nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3"
+  }
+}
