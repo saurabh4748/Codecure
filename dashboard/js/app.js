@@ -412,7 +412,7 @@ const app = {
   },
 
   /* ---- Save Session ---- */
-  saveSession() {
+  async saveSession() {
     if (!this._lastResult) return;
 
     await Sessions.add({
