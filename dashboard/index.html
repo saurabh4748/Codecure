@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeCure | AI Triage System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo"><span class="logo-cross">⚕</span> Code<span class="accent">Cure</span></div>
+      <div class="tagline">AI TRIAGE SYSTEM</div>
+    </div>
+    <div class="header-center">
+      <div class="system-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="systemStatusText">CONNECTING...</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div>CHANNEL: <span class="accent">3446548</span></div>
+      <div>LAST UPDATE: <span id="lastUpdateTime" class="accent">--:--:--</span></div>
+    </div>
+  </header>
+
+  <!-- ===== LAYOUT ===== -->
+  <div class="layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <nav class="nav">
+        <button class="nav-btn active" data-page="triage" onclick="app.navigate('triage')">
+          <span>🏥</span><span>Triage Station</span>
+        </button>
+        <button class="nav-btn" data-page="dashboard" onclick="app.navigate('dashboard')">
+          <span>📊</span><span>Live Dashboard</span>
+        </button>
+        <button class="nav-btn" data-page="sessions" onclick="app.navigate('sessions')">
+          <span>📋</span><span>All Sessions</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-stats">
+        <div class="sidebar-stat-item">
+          <div class="sidebar-stat-label">SESSIONS TODAY</div>
+          <div class="sidebar-stat-val" id="sidebarSessions">0</div>
+        </div>
+        <div class="sidebar-stat-item">
+          <div class="sidebar-stat-label">CRITICAL ALERTS</div>
+          <div class="sidebar-stat-val danger" id="sidebarCritical">0</div>
+        </div>
+        <div class="sidebar-stat-item">
+          <div class="sidebar-stat-label">AVG BPM (TODAY)</div>
+          <div class="sidebar-stat-val" id="sidebarAvg">--</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+
+      <!-- ========== PAGE: TRIAGE ========== -->
+      <section class="page active" id="page-triage">
+        <div class="page-header">
+          <h2>PATIENT INTAKE &amp; TRIAGE</h2>
+          <p>Enter patient details, place finger on sensor, then initiate scan</p>
+        </div>
+
+        <div class="triage-grid">
+
+          <!-- Patient Form -->
+          <div class="card">
+            <div class="card-header">PATIENT DEMOGRAPHICS</div>
+            <form id="patientForm" class="patient-form" onsubmit="return false">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>PATIENT NAME *</label>
+                  <input type="text" id="patientName" placeholder="Full name" autocomplete="off">
+                </div>
+                <div class="form-group">
+                  <label>AGE *</label>
+                  <input type="number" id="patientAge" placeholder="Years" min="0" max="150">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>GENDER</label>
+                  <select id="patientGender">
+                    <option value="">Select</option>
+                    <option>Male</option>
+                    <option>Female</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>BLOOD GROUP</label>
+                  <select id="patientBlood">
+                    <option value="">Unknown</option>
+                    <option>A+</option><option>A-</option>
+                    <option>B+</option><option>B-</option>
+                    <option>AB+</option><option>AB-</option>
+                    <option>O+</option><option>O-</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>CHIEF COMPLAINT</label>
+                <textarea id="patientComplaint" rows="3" placeholder="Describe symptoms or reason for visit..."></textarea>
+              </div>
+              <div class="form-group">
+                <label>KNOWN CONDITIONS / MEDICATIONS</label>
+                <input type="text" id="patientHistory" placeholder="e.g. Hypertension, Aspirin...">
+              </div>
+            </form>
+          </div>
+
+          <!-- Sensor Panel -->
+          <div class="card sensor-card">
+            <div class="card-header">BIOSENSOR LIVE FEED</div>
+
+            <div class="sensor-body">
+              <div class="bpm-wrap" id="bpmWrap">
+                <div class="bpm-number" id="liveBPM">--</div>
+                <div class="bpm-label">BPM</div>
+                <div class="heart-icon" id="heartIcon">♥</div>
+              </div>
+
+              <div class="status-badge" id="triageStatusBadge">
+                <span id="triageStatusText">STANDBY</span>
+              </div>
+
+              <div class="sensor-meta-row">
+                <div class="sensor-meta-item">
+                  <span class="meta-key">SENSOR</span>
+                  <span class="meta-val">PULSE</span>
+                </div>
+                <div class="sensor-meta-item">
+                  <span class="meta-key">CHANNEL</span>
+                  <span class="meta-val">3446548</span>
+                </div>
+                <div class="sensor-meta-item">
+                  <span class="meta-key">INTERVAL</span>
+                  <span class="meta-val">15s</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="protocol-box">
+              <div class="protocol-title">SCAN PROTOCOL</div>
+              <ol>
+                <li>Enter patient demographics</li>
+                <li>Place index finger on pulse sensor</li>
+                <li>Click <strong>INITIATE SCAN</strong></li>
+                <li>Hold still — reading takes up to 15 s</li>
+                <li>Review triage classification &amp; save</li>
+              </ol>
+            </div>
+
+            <div class="scan-btns">
+              <button class="btn btn-primary" id="scanBtn" onclick="app.startScan()">⚡ INITIATE SCAN</button>
+              <button class="btn btn-danger" id="stopBtn" onclick="app.stopScan()" style="display:none">■ STOP</button>
+              <button class="btn btn-success" id="saveBtn" onclick="app.saveSession()" style="display:none">✓ SAVE RECORD</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Triage Result -->
+        <div class="card" id="resultCard" style="display:none">
+          <div class="card-header">TRIAGE CLASSIFICATION RESULT</div>
+          <div id="resultContent" class="result-body"></div>
+        </div>
+      </section>
+
+      <!-- ========== PAGE: DASHBOARD ========== -->
+      <section class="page" id="page-dashboard">
+        <div class="page-header">
+          <h2>LIVE MONITORING DASHBOARD</h2>
+          <p>Real-time data from ThingSpeak &mdash; auto-refreshes every 15 seconds</p>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-card-label">CURRENT BPM</div>
+            <div class="stat-card-val accent" id="dCurrent">--</div>
+            <div class="stat-card-sub" id="dCurrentStatus">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">AVERAGE BPM</div>
+            <div class="stat-card-val" id="dAvg">--</div>
+            <div class="stat-card-sub">LAST 50 READINGS</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">MIN BPM</div>
+            <div class="stat-card-val success" id="dMin">--</div>
+            <div class="stat-card-sub">IN DATASET</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">MAX BPM</div>
+            <div class="stat-card-val danger" id="dMax">--</div>
+            <div class="stat-card-sub">IN DATASET</div>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="card chart-card span2">
+            <div class="card-header">
+              HEART RATE TREND (LAST 50 READINGS)
+              <button class="refresh-btn" onclick="app.refreshDashboard()">↻ REFRESH</button>
+            </div>
+            <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+          </div>
+          <div class="card chart-card">
+            <div class="card-header">BPM DISTRIBUTION</div>
+            <div class="chart-wrap"><canvas id="distChart"></canvas></div>
+          </div>
+          <div class="card chart-card">
+            <div class="card-header">STATUS BREAKDOWN</div>
+            <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+          </div>
+          <div class="card chart-card">
+            <div class="card-header">RECENT READINGS</div>
+            <div id="recentReadings" class="readings-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== PAGE: SESSIONS ========== -->
+      <section class="page" id="page-sessions">
+        <div class="page-header">
+          <h2>PATIENT SESSION RECORDS</h2>
+          <p>All recorded triage sessions — stored locally in this browser</p>
+        </div>
+
+        <div class="sessions-toolbar">
+          <input type="text" id="searchInput" placeholder="Search name or complaint..." oninput="app.filterSessions()">
+          <select id="statusFilter" onchange="app.filterSessions()">
+            <option value="">All Statuses</option>
+            <option value="NORMAL">Normal</option>
+            <option value="LOW">Low (Bradycardia)</option>
+            <option value="HIGH">High (Tachycardia)</option>
+          </select>
+          <button class="btn btn-secondary" onclick="app.exportCSV()">↓ EXPORT CSV</button>
+          <button class="btn btn-danger-outline" onclick="app.clearAllSessions()">✕ CLEAR ALL</button>
+        </div>
+
+        <div class="card">
+          <table class="sessions-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>DATE / TIME</th>
+                <th>PATIENT NAME</th>
+                <th>AGE</th>
+                <th>BPM</th>
+                <th>STATUS</th>
+                <th>CHIEF COMPLAINT</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="sessionsBody">
+              <tr class="empty-row"><td colspan="8">No sessions yet. Complete a triage scan to create records.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
