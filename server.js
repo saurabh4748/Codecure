@@ -61,6 +61,17 @@ app.delete('/api/sessions', (_req, res) => {
   res.json({ ok: true });
 });
 
+// PATCH checklist for a session
+app.patch('/api/sessions/:id/checklist', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const sessions = load();
+  const idx = sessions.findIndex(s => s.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'not found' });
+  sessions[idx].checklist = { ...(sessions[idx].checklist ?? {}), ...req.body };
+  save(sessions);
+  res.json(sessions[idx].checklist);
+});
+
 // ===================== TIMELINE =====================
 const TIMELINE_FILE = path.join(__dirname, 'timeline.json');
 if (!fs.existsSync(TIMELINE_FILE)) fs.writeFileSync(TIMELINE_FILE, '[]');

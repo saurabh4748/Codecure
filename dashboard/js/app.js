@@ -134,6 +134,13 @@ const Alerts = {
   }
 };
 
+const CHECKLIST_STEPS = [
+  { key: 'dispatch',   label: 'Dispatch team / ambulance' },
+  { key: 'contact',    label: 'Contact patient / family' },
+  { key: 'escalation', label: 'Escalate to senior doctor' },
+  { key: 'resolution', label: 'Mark as resolved' }
+];
+
 /* ---- Clinical Validation ---- */
 function validatePatient(name, age) {
   const errors = [];
@@ -283,8 +290,8 @@ const app = {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(`page-${page}`).classList.add('active');
     document.querySelector(`[data-page="${page}"]`).classList.add('active');
-    if (page === 'timeline') this.renderTimelinePage();
-    if (page === 'alerts')   this.renderAlertsPage();
+    if (page === 'timeline')   this.renderTimelinePage();
+    if (page === 'alerts')     this.renderAlertsPage();
   },
 
   /* ---- ThingSpeak API ---- */
@@ -480,7 +487,7 @@ const app = {
         </div>
       </div>
       <div class="result-classification ${status}">
-        <div class="class-label">AI CLASSIFICATION</div>
+        <div class="class-label">TRIAGE CLASSIFICATION</div>
         <div class="class-msg">${info.msg}</div>
         <div class="class-rec">REC: ${info.rec}</div>
         ${complaint ? `<div class="class-complaint">COMPLAINT: ${complaint}</div>` : ''}
@@ -552,20 +559,32 @@ const app = {
   async renderSessionsTable() {
     let list = await Sessions.all();
 
-    const search  = (document.getElementById('searchInput')?.value ?? '').toLowerCase();
-    const stFilter = document.getElementById('statusFilter')?.value ?? '';
+    const search      = (document.getElementById('searchInput')?.value ?? '').toLowerCase();
+    const stFilter    = document.getElementById('statusFilter')?.value ?? '';
+    const bloodFilter = document.getElementById('bloodFilter')?.value ?? '';
 
-    if (search)   list = list.filter(s => s.name.toLowerCase().includes(search) || s.complaint.toLowerCase().includes(search));
-    if (stFilter) list = list.filter(s => s.status === stFilter);
+    if (search)      list = list.filter(s => s.name.toLowerCase().includes(search) || s.complaint.toLowerCase().includes(search));
+    if (stFilter)    list = list.filter(s => s.status === stFilter);
+    if (bloodFilter) list = list.filter(s => s.blood === bloodFilter);
 
     const tbody = document.getElementById('sessionsBody');
     if (!list.length) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No sessions found.</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No sessions found.</td></tr>';
       return;
     }
 
-    tbody.innerHTML = list.map((s, i) => `
-      <tr>
+    tbody.innerHTML = list.map((s, i) => {
+      const cl    = s.checklist ?? {};
+      const done  = CHECKLIST_STEPS.filter(st => cl[st.key]).length;
+      const total = CHECKLIST_STEPS.length;
+      const progColor = done === total ? 'var(--success)' : done > 0 ? 'var(--warning)' : 'var(--text-dim)';
+      const steps = CHECKLIST_STEPS.map(step => `
+            <label class="checklist-item${cl[step.key] ? ' done' : ''}">
+              <input type="checkbox"${cl[step.key] ? ' checked' : ''} onchange="app.patchChecklist(${s.id},'${step.key}',this.checked)">
+              <span>${step.label}</span>
+            </label>`).join('');
+      return `
+      <tr id="sr-${s.id}">
         <td style="font-family:var(--mono);color:var(--text-dim)">${i + 1}</td>
         <td style="font-family:var(--mono);font-size:11px">${fmtDateTime(s.ts)}</td>
         <td><strong>${esc(s.name)}</strong></td>
@@ -573,8 +592,14 @@ const app = {
         <td style="font-family:var(--mono);font-size:18px;color:var(--accent)">${s.bpm}</td>
         <td><span class="badge ${s.status}">${s.status}</span></td>
         <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.complaint)}">${esc(s.complaint)}</td>
+        <td><button class="checklist-prog-btn" onclick="app.toggleChecklistRow(${s.id})" style="color:${progColor}">${done}/${total} ▾</button></td>
+        <td><button class="brief-btn" onclick="app.exportBrief(${s.id})" title="Download response brief">📄</button></td>
         <td><button class="del-btn" onclick="app.deleteSession(${s.id})" title="Delete">✕</button></td>
-      </tr>`).join('');
+      </tr>
+      <tr class="checklist-row" id="cr-${s.id}" style="display:none">
+        <td colspan="10"><div class="checklist-panel">${steps}</div></td>
+      </tr>`;
+    }).join('');
   },
 
   filterSessions() { this.renderSessionsTable(); },
@@ -688,6 +713,126 @@ const app = {
       a.click();
       URL.revokeObjectURL(a.href);
     } catch { alert('FHIR export failed — ensure server is running'); }
+  },
+
+  toggleChecklistRow(id) {
+    const row = document.getElementById(`cr-${id}`);
+    if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+  },
+
+  async patchChecklist(sessionId, key, checked) {
+    try {
+      await fetch(`/api/sessions/${sessionId}/checklist`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: checked })
+      });
+    } catch {}
+    // Optimistic UI: recount from current checkboxes
+    const panel = document.querySelector(`#cr-${sessionId} .checklist-panel`);
+    if (!panel) return;
+    const done = Array.from(panel.querySelectorAll('input[type=checkbox]')).filter(c => c.checked).length;
+    const btn  = document.querySelector(`#sr-${sessionId} .checklist-prog-btn`);
+    if (btn) {
+      btn.textContent = `${done}/${CHECKLIST_STEPS.length} ▾`;
+      btn.style.color = done === CHECKLIST_STEPS.length ? 'var(--success)' : done > 0 ? 'var(--warning)' : 'var(--text-dim)';
+    }
+    panel.querySelectorAll('.checklist-item').forEach(item => {
+      item.classList.toggle('done', item.querySelector('input[type=checkbox]').checked);
+    });
+  },
+
+  async exportBrief(sessionId) {
+    const sessions = await Sessions.all();
+    const s = sessions.find(x => x.id === sessionId);
+    if (!s) return;
+    const cl    = s.checklist ?? {};
+    const score = calcRiskScore(s.bpm, s.age, s.complaint, s.history);
+    const risk  = riskLabel(score);
+    const INFO  = {
+      NORMAL: { priority: 'NON-URGENT', rec: 'Continue monitoring. Proceed with standard assessment.' },
+      LOW:    { priority: 'URGENT',     rec: 'Physician evaluation recommended. Assess for dizziness, fatigue, or syncope.' },
+      HIGH:   { priority: 'IMMEDIATE',  rec: 'Immediate physician evaluation required. Monitor for chest pain or breathlessness.' }
+    };
+    const info = INFO[s.status] ?? INFO.NORMAL;
+    let tlLines = '  No timeline events recorded.';
+    try {
+      const tl = await Timeline.all();
+      const ev = tl.filter(e => e.sessionId === sessionId);
+      if (ev.length) tlLines = ev.map(e => `  [${fmtDateTime(e.ts)}] ${e.type}: ${e.note}`).join('\n');
+    } catch {}
+    const checkLines = CHECKLIST_STEPS.map(st => `  [${cl[st.key] ? 'x' : ' '}] ${st.label}`).join('\n');
+    const sep = '='.repeat(46);
+    const div = '-'.repeat(25);
+    const brief = [
+      'CODECURE — INCIDENT RESPONSE BRIEF',
+      sep,
+      `Generated : ${new Date().toLocaleString('en-IN')}`,
+      '',
+      'PATIENT INFORMATION', div,
+      `Name      : ${s.name}`,
+      `Age       : ${s.age}   |   Gender : ${s.gender}   |   Blood : ${s.blood}`,
+      `Recorded  : ${fmtDateTime(s.ts)}`,
+      '',
+      'VITAL SIGNS', div,
+      `BPM       : ${s.bpm}   |   Status : ${s.status}   |   Priority : ${info.priority}`,
+      '',
+      'CHIEF COMPLAINT', div,
+      `  ${s.complaint}`,
+      '',
+      'KNOWN CONDITIONS / MEDICATIONS', div,
+      `  ${s.history}`,
+      '',
+      'RISK ASSESSMENT', div,
+      `Score     : ${score}/100   |   ${risk.label}`,
+      '',
+      'RESPONSE CHECKLIST', div,
+      checkLines,
+      '',
+      'INCIDENT TIMELINE', div,
+      tlLines,
+      '',
+      'RECOMMENDATIONS', div,
+      `  ${info.rec}`,
+      '',
+      sep,
+      'CodeCure: AI for Healthcare & Digital Wellbeing | Channel: 3446548'
+    ].join('\n');
+    const blob = new Blob([brief], { type: 'text/plain' });
+    const a = Object.assign(document.createElement('a'), {
+      href:     URL.createObjectURL(blob),
+      download: `codecure_brief_${s.name.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.txt`
+    });
+    a.click();
+    URL.revokeObjectURL(a.href);
+  },
+
+  resetFilters() {
+    document.getElementById('searchInput').value  = '';
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('bloodFilter').value  = '';
+    this.renderSessionsTable();
+  },
+
+  async seedDemoIncident() {
+    const saved = await Sessions.add({
+      name: 'DEMO — Ravi Kumar', age: '58', gender: 'Male', blood: 'O+',
+      complaint: 'Chest tightness, shortness of breath', history: 'Hypertension, Aspirin',
+      bpm: 118, status: 'HIGH'
+    });
+    if (saved?.id) {
+      await fetch(`/api/sessions/${saved.id}/checklist`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dispatch: true, contact: true, escalation: true, resolution: true })
+      });
+      await Timeline.add(saved.id, 'SCAN',       'BPM: 118 | Status: HIGH | Patient: DEMO — Ravi Kumar');
+      await Timeline.add(saved.id, 'ALERT',      'HIGH alert — Tachycardia detected');
+      await Timeline.add(saved.id, 'ESCALATION', 'Escalated to Dr. Sharma (Cardiology)');
+      await Timeline.add(saved.id, 'RESOLUTION', 'Patient stabilized and admitted to ICU');
+    }
+    await this.renderSessionsTable();
+    await this.refreshSidebarStats();
   },
 
   /* Called from refresh button on dashboard page — proxied to _doRefresh */

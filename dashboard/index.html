@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CodeCure | AI Triage System</title>
+  <title>CodeCure: AI for Healthcare &amp; Digital Wellbeing</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="js/chart.umd.min.js"></script>
@@ -15,7 +15,7 @@
   <header class="header">
     <div class="header-left">
       <div class="logo"><span class="logo-cross">⚕</span> Code<span class="accent">Cure</span></div>
-      <div class="tagline">AI TRIAGE SYSTEM</div>
+      <div class="tagline">AI FOR HEALTHCARE &amp; DIGITAL WELLBEING</div>
     </div>
     <div class="header-center">
       <div class="system-status">
@@ -49,6 +49,9 @@
         </button>
         <button class="nav-btn" data-page="alerts" onclick="app.navigate('alerts')">
           <span>🔔</span><span>Alerts&nbsp;<span class="alert-nav-badge" id="alertBadge" style="display:none">0</span></span>
+        </button>
+        <button class="nav-btn" data-page="howitworks" onclick="app.navigate('howitworks')">
+          <span>⚙</span><span>How It Works</span>
         </button>
       </nav>
 
@@ -257,9 +260,18 @@
             <option value="LOW">Low (Bradycardia)</option>
             <option value="HIGH">High (Tachycardia)</option>
           </select>
+          <select id="bloodFilter" onchange="app.filterSessions()">
+            <option value="">All Blood Groups</option>
+            <option>A+</option><option>A-</option>
+            <option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option>
+            <option>O+</option><option>O-</option>
+          </select>
+          <button class="btn btn-secondary" onclick="app.resetFilters()">↺ RESET</button>
           <button class="btn btn-secondary" onclick="app.exportCSV()">↓ EXPORT CSV</button>
           <button class="btn btn-danger-outline" onclick="app.clearAllSessions()">✕ CLEAR ALL</button>
           <button class="btn btn-secondary" onclick="app.exportFHIR()">⬡ FHIR EXPORT</button>
+          <button class="btn btn-secondary" onclick="app.seedDemoIncident()" title="Seed a completed demo incident">＋ DEMO</button>
         </div>
 
         <div class="card">
@@ -273,11 +285,13 @@
                 <th>BPM</th>
                 <th>STATUS</th>
                 <th>CHIEF COMPLAINT</th>
+                <th>CHECKLIST</th>
+                <th>BRIEF</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="sessionsBody">
-              <tr class="empty-row"><td colspan="8">No sessions yet. Complete a triage scan to create records.</td></tr>
+              <tr class="empty-row"><td colspan="10">No sessions yet. Complete a triage scan to create records.</td></tr>
             </tbody>
           </table>
         </div>
@@ -305,6 +319,102 @@
           <div class="card-header">ACTIVE ALERTS <button class="refresh-btn" onclick="app.renderAlertsPage()">↻ REFRESH</button></div>
           <div id="alertsList" class="alerts-list"></div>
         </div>
+      </section>
+
+      <!-- ========== PAGE: HOW IT WORKS ========== -->
+      <section class="page" id="page-howitworks">
+        <div class="page-header">
+          <h2>HOW IT WORKS</h2>
+          <p>End-to-end data flow — from patient biosensor to clinical triage decision</p>
+        </div>
+
+        <!-- Flow Diagram -->
+        <div class="hiw-flow">
+
+          <div class="hiw-node">
+            <div class="hiw-icon">💓</div>
+            <div class="hiw-node-title">PULSE SENSOR</div>
+            <div class="hiw-node-sub">MAX30102 / Analog</div>
+            <div class="hiw-node-desc">Captures photoplethysmography (PPG) signal from fingertip in real time</div>
+            <div class="hiw-tag">Hardware</div>
+          </div>
+
+          <div class="hiw-arrow"><div class="hiw-arrow-line"><span class="hiw-arrow-dot"></span></div><div class="hiw-arrow-label">Analog Signal</div></div>
+
+          <div class="hiw-node accent-node">
+            <div class="hiw-icon">🔲</div>
+            <div class="hiw-node-title">ESP32</div>
+            <div class="hiw-node-sub">Microcontroller</div>
+            <div class="hiw-node-desc">Reads sensor, computes BPM, shows status on LCD display, triggers LED &amp; buzzer alerts</div>
+            <div class="hiw-tag">Firmware</div>
+          </div>
+
+          <div class="hiw-arrow"><div class="hiw-arrow-line"><span class="hiw-arrow-dot"></span></div><div class="hiw-arrow-label">WiFi / HTTPS</div></div>
+
+          <div class="hiw-node">
+            <div class="hiw-icon">☁</div>
+            <div class="hiw-node-title">THINGSPEAK</div>
+            <div class="hiw-node-sub">IoT Cloud Platform</div>
+            <div class="hiw-node-desc">Receives BPM readings every 15 s, stores time-series data, exposes REST API for retrieval</div>
+            <div class="hiw-tag">Cloud</div>
+          </div>
+
+          <div class="hiw-arrow"><div class="hiw-arrow-line"><span class="hiw-arrow-dot"></span></div><div class="hiw-arrow-label">REST API</div></div>
+
+          <div class="hiw-node accent-node">
+            <div class="hiw-icon">🖥</div>
+            <div class="hiw-node-title">CODECURE DASHBOARD</div>
+            <div class="hiw-node-sub">Node.js + Browser</div>
+            <div class="hiw-node-desc">Polls ThingSpeak every 15 s, renders live charts, runs triage classification, manages patient records</div>
+            <div class="hiw-tag">Software</div>
+          </div>
+
+          <div class="hiw-arrow"><div class="hiw-arrow-line"><span class="hiw-arrow-dot"></span></div><div class="hiw-arrow-label">Clinical Output</div></div>
+
+          <div class="hiw-node">
+            <div class="hiw-icon">🏥</div>
+            <div class="hiw-node-title">TRIAGE DECISION</div>
+            <div class="hiw-node-sub">Clinical Assessment</div>
+            <div class="hiw-node-desc">Classifies patient as Normal, Bradycardia, or Tachycardia — generates alerts, timeline, and response brief</div>
+            <div class="hiw-tag">Output</div>
+          </div>
+
+        </div>
+
+        <!-- Status Zones -->
+        <div class="hiw-zones">
+          <div class="hiw-zone normal">
+            <div class="hiw-zone-bpm">60 – 100 BPM</div>
+            <div class="hiw-zone-label">NORMAL</div>
+            <div class="hiw-zone-desc">Green LED. No alert. Standard monitoring continues.</div>
+          </div>
+          <div class="hiw-zone low">
+            <div class="hiw-zone-bpm">&lt; 60 BPM</div>
+            <div class="hiw-zone-label">BRADYCARDIA</div>
+            <div class="hiw-zone-desc">Yellow LED + buzzer. Urgent alert issued. Physician evaluation required.</div>
+          </div>
+          <div class="hiw-zone high">
+            <div class="hiw-zone-bpm">&gt; 100 BPM</div>
+            <div class="hiw-zone-label">TACHYCARDIA</div>
+            <div class="hiw-zone-desc">Red LED + buzzer. Immediate alert. Senior physician notified.</div>
+          </div>
+        </div>
+
+        <!-- Tech Stack -->
+        <div class="hiw-stack">
+          <div class="card">
+            <div class="card-header">TECHNOLOGY STACK</div>
+            <div class="hiw-stack-grid">
+              <div class="hiw-stack-item"><span class="hiw-stack-cat">Hardware</span><span>ESP32 · Pulse Sensor · LCD 16×2 · LEDs · Buzzer</span></div>
+              <div class="hiw-stack-item"><span class="hiw-stack-cat">Firmware</span><span>Arduino C++ · PulseSensorPlayground · ThingSpeak Library · WiFi</span></div>
+              <div class="hiw-stack-item"><span class="hiw-stack-cat">Cloud</span><span>ThingSpeak IoT · Channel 3446548 · REST API · 15 s upload interval</span></div>
+              <div class="hiw-stack-item"><span class="hiw-stack-cat">Backend</span><span>Node.js · Express · JSON file store · FHIR-style resource layer</span></div>
+              <div class="hiw-stack-item"><span class="hiw-stack-cat">Frontend</span><span>Vanilla JS · Chart.js · CSS3 animations · Responsive layout</span></div>
+              <div class="hiw-stack-item"><span class="hiw-stack-cat">Standards</span><span>FHIR R4 · HL7 LOINC 8867-4 · ISO 8601 timestamps · OWASP input validation</span></div>
+            </div>
+          </div>
+        </div>
+
       </section>
 
     </main>

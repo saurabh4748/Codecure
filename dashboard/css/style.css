@@ -666,10 +666,249 @@ select option { background: var(--bg-card); }
 
 .alerts-empty { text-align: center; font-family: var(--mono); font-size: 12px; color: var(--text-dim); padding: 40px; }
 
+/* ===================== CHECKLIST ===================== */
+.checklist-prog-btn {
+  background: none;
+  border: 1px solid var(--border-hi);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color .2s, border-color .2s;
+}
+.checklist-prog-btn:hover { border-color: var(--accent); color: var(--accent) !important; }
+
+.checklist-row td { padding: 0 !important; }
+
+.checklist-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border);
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: all .2s;
+  user-select: none;
+}
+.checklist-item:hover { border-color: var(--accent-dim); color: var(--text); }
+.checklist-item.done  { color: var(--success); border-color: rgba(0,255,136,.3); text-decoration: line-through; }
+.checklist-item input[type=checkbox] { accent-color: var(--success); cursor: pointer; }
+
+/* ===================== BRIEF BUTTON ===================== */
+.brief-btn {
+  background: none;
+  border: 1px solid var(--border-hi);
+  color: var(--text-dim);
+  font-size: 14px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.brief-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ===================== HOW IT WORKS ===================== */
+.hiw-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 32px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.hiw-node {
+  flex: 1;
+  min-width: 148px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hi);
+  border-radius: 10px;
+  padding: 22px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  transition: border-color .25s, box-shadow .25s;
+  position: relative;
+}
+.hiw-node:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 18px rgba(0,212,255,.12);
+}
+.hiw-node.accent-node {
+  border-color: rgba(0,212,255,.35);
+  background: linear-gradient(160deg, #0d1a30 0%, var(--bg-card) 100%);
+}
+
+.hiw-icon {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.hiw-node-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  font-weight: bold;
+}
+.hiw-node-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+.hiw-node-desc {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.55;
+  margin-top: 4px;
+}
+.hiw-tag {
+  margin-top: auto;
+  padding-top: 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  width: 100%;
+  text-align: center;
+}
+
+/* Animated connector arrows */
+.hiw-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 54px;
+  gap: 5px;
+  padding-top: 8px;
+}
+.hiw-arrow-line {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--border-hi), var(--accent), var(--border-hi));
+  border-radius: 2px;
+  position: relative;
+  overflow: visible;
+}
+.hiw-arrow-dot {
+  position: absolute;
+  top: -4px;
+  left: -8px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: flowDot 2s linear infinite;
+}
+@keyframes flowDot {
+  0%   { left: -8px;    opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { left: calc(100% - 2px); opacity: 0; }
+}
+.hiw-arrow-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Status zones */
+.hiw-zones {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.hiw-zone {
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  border: 1px solid;
+}
+.hiw-zone.normal { border-color: var(--success); background: var(--success-dim); }
+.hiw-zone.low    { border-color: var(--warning); background: var(--warning-dim); }
+.hiw-zone.high   { border-color: var(--danger);  background: var(--danger-dim); }
+
+.hiw-zone-bpm {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+.hiw-zone.normal .hiw-zone-bpm { color: var(--success); }
+.hiw-zone.low    .hiw-zone-bpm { color: var(--warning); }
+.hiw-zone.high   .hiw-zone-bpm { color: var(--danger); }
+
+.hiw-zone-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+  color: var(--text-hi);
+}
+.hiw-zone-desc {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* Tech stack */
+.hiw-stack-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.hiw-stack-item {
+  display: flex;
+  gap: 16px;
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text);
+  align-items: baseline;
+}
+.hiw-stack-item:last-child { border-bottom: none; }
+.hiw-stack-cat {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  flex-shrink: 0;
+  width: 90px;
+}
+
 @media (max-width: 800px) {
   .sidebar   { display: none; }
   .charts-grid { grid-template-columns: 1fr; }
   .chart-card.span2 { grid-column: span 1; }
   .stats-row { grid-template-columns: 1fr 1fr; }
   .header-right { display: none; }
+  .hiw-flow  { flex-direction: column; }
+  .hiw-arrow { width: 100%; flex-direction: row; height: 36px; }
+  .hiw-arrow-line { height: 2px; flex: 1; }
+  .hiw-zones { grid-template-columns: 1fr; }
 }
