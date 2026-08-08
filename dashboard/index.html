@@ -44,6 +44,12 @@
         <button class="nav-btn" data-page="sessions" onclick="app.navigate('sessions')">
           <span>📋</span><span>All Sessions</span>
         </button>
+        <button class="nav-btn" data-page="timeline" onclick="app.navigate('timeline')">
+          <span>🕒</span><span>Patient Timeline</span>
+        </button>
+        <button class="nav-btn" data-page="alerts" onclick="app.navigate('alerts')">
+          <span>🔔</span><span>Alerts&nbsp;<span class="alert-nav-badge" id="alertBadge" style="display:none">0</span></span>
+        </button>
       </nav>
 
       <div class="sidebar-stats">
@@ -59,6 +65,10 @@
           <div class="sidebar-stat-label">AVG BPM (TODAY)</div>
           <div class="sidebar-stat-val" id="sidebarAvg">--</div>
         </div>
+        <div class="sidebar-stat-item">
+          <div class="sidebar-stat-label">PENDING ALERTS</div>
+          <div class="sidebar-stat-val danger" id="sidebarAlerts">0</div>
+        </div>
       </div>
     </aside>
 
@@ -71,6 +81,8 @@
           <h2>PATIENT INTAKE &amp; TRIAGE</h2>
           <p>Enter patient details, place finger on sensor, then initiate scan</p>
         </div>
+
+        <div class="validation-banner" id="validationBanner" style="display:none"></div>
 
         <div class="triage-grid">
 
@@ -247,6 +259,7 @@
           </select>
           <button class="btn btn-secondary" onclick="app.exportCSV()">↓ EXPORT CSV</button>
           <button class="btn btn-danger-outline" onclick="app.clearAllSessions()">✕ CLEAR ALL</button>
+          <button class="btn btn-secondary" onclick="app.exportFHIR()">⬡ FHIR EXPORT</button>
         </div>
 
         <div class="card">
@@ -267,6 +280,30 @@
               <tr class="empty-row"><td colspan="8">No sessions yet. Complete a triage scan to create records.</td></tr>
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- ========== PAGE: TIMELINE ========== -->
+      <section class="page" id="page-timeline">
+        <div class="page-header">
+          <h2>PATIENT TIMELINE &amp; AUDIT LOG</h2>
+          <p>Chronological log of all scan and alert events</p>
+        </div>
+        <div class="card">
+          <div class="card-header">AUDIT LOG <button class="refresh-btn" onclick="app.renderTimelinePage()">↻ REFRESH</button></div>
+          <div id="timelineList" class="timeline-list"></div>
+        </div>
+      </section>
+
+      <!-- ========== PAGE: ALERTS ========== -->
+      <section class="page" id="page-alerts">
+        <div class="page-header">
+          <h2>ALERT &amp; ESCALATION QUEUE</h2>
+          <p>Background alerts for high-severity triage events</p>
+        </div>
+        <div class="card">
+          <div class="card-header">ACTIVE ALERTS <button class="refresh-btn" onclick="app.renderAlertsPage()">↻ REFRESH</button></div>
+          <div id="alertsList" class="alerts-list"></div>
         </div>
       </section>
 

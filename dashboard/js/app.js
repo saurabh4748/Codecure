@@ -93,6 +93,80 @@ const Sessions = {
 };
 
 /* ============================================
+   Timeline & Alerts API clients
+   ============================================ */
+const Timeline = {
+  async add(sessionId, type, note) {
+    try {
+      await fetch('/api/timeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, type, note })
+      });
+    } catch {}
+  },
+  async all() {
+    try { return await (await fetch('/api/timeline')).json(); } catch { return []; }
+  }
+};
+
+const Alerts = {
+  async create(data) {
+    try {
+      await fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+    } catch {}
+  },
+  async all() {
+    try { return await (await fetch('/api/alerts')).json(); } catch { return []; }
+  },
+  async patch(id, updates) {
+    try {
+      await fetch(`/api/alerts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+    } catch {}
+  }
+};
+
+/* ---- Clinical Validation ---- */
+function validatePatient(name, age) {
+  const errors = [];
+  if (!name) errors.push('Patient name is required');
+  const a = parseInt(age);
+  if (age && (isNaN(a) || a < 0 || a > 150)) errors.push('Age must be between 0 and 150');
+  return errors;
+}
+
+/* ---- Risk Score (0–100) ---- */
+function calcRiskScore(bpm, age, complaint, history) {
+  let score = 0;
+  // BPM deviation from centre of normal range
+  score += Math.min(Math.abs(bpm - 75), 60);
+  // Age risk
+  const a = parseInt(age) || 0;
+  if ((a > 0 && a < 18) || a > 65) score += 15;
+  else if (a > 50) score += 8;
+  // High-risk keywords in complaint/history
+  const text = `${complaint} ${history}`.toLowerCase();
+  if (['chest pain','breathless','syncope','unconscious','collapse','faint','palpitation'].some(w => text.includes(w))) score += 15;
+  if (['hypertension','cardiac','arrhythmia','heart disease','diabetes'].some(w => text.includes(w))) score += 10;
+  return Math.min(Math.round(score), 100);
+}
+
+function riskLabel(score) {
+  if (score <= 25) return { label: 'LOW RISK',      color: '#00ff88' };
+  if (score <= 50) return { label: 'MODERATE RISK', color: '#ffaa00' };
+  if (score <= 75) return { label: 'HIGH RISK',     color: '#ff8800' };
+  return              { label: 'CRITICAL',          color: '#ff4466' };
+}
+
+/* ============================================
    Chart Manager
    ============================================ */
 const Charts = {
@@ -198,8 +272,8 @@ const app = {
     Charts.init();
     await this.refreshSidebarStats();
     await this.renderSessionsTable();
+    await this.refreshAlertBadge();
     await this._doRefresh();
-    // Auto-refresh every 15 s matching ESP32 upload cadence
     this._autoRefresh = setInterval(() => this._doRefresh(), 15000);
   },
 
@@ -209,6 +283,8 @@ const app = {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(`page-${page}`).classList.add('active');
     document.querySelector(`[data-page="${page}"]`).classList.add('active');
+    if (page === 'timeline') this.renderTimelinePage();
+    if (page === 'alerts')   this.renderAlertsPage();
   },
 
   /* ---- ThingSpeak API ---- */
@@ -301,13 +377,17 @@ const app = {
   /* ---- Scan ---- */
   async startScan() {
     const name = document.getElementById('patientName').value.trim();
-    if (!name) {
-      const inp = document.getElementById('patientName');
-      inp.classList.add('error');
-      inp.focus();
-      setTimeout(() => inp.classList.remove('error'), 2000);
+    const age  = document.getElementById('patientAge').value;
+    const errors = validatePatient(name, age);
+    const banner = document.getElementById('validationBanner');
+    if (errors.length) {
+      banner.innerHTML = errors.map(e => `<span>⚠ ${esc(e)}</span>`).join('');
+      banner.style.display = 'flex';
+      if (!name) { document.getElementById('patientName').classList.add('error'); }
+      setTimeout(() => { banner.style.display = 'none'; document.getElementById('patientName').classList.remove('error'); }, 3000);
       return;
     }
+    banner.style.display = 'none';
 
     this._lastResult = null;
     this._scanStart  = Date.now();
@@ -415,8 +495,9 @@ const app = {
   async saveSession() {
     if (!this._lastResult) return;
 
-    await Sessions.add({
-      name:      document.getElementById('patientName').value.trim(),
+    const patientName = document.getElementById('patientName').value.trim();
+    const saved = await Sessions.add({
+      name:      patientName,
       age:       document.getElementById('patientAge').value       || '--',
       gender:    document.getElementById('patientGender').value    || '--',
       blood:     document.getElementById('patientBlood').value     || '--',
@@ -425,6 +506,25 @@ const app = {
       bpm:       this._lastResult.bpm,
       status:    this._lastResult.status
     });
+
+    // Audit log entry
+    await Timeline.add(saved?.id, 'SCAN', `BPM: ${this._lastResult.bpm} | Status: ${this._lastResult.status} | Patient: ${patientName}`);
+
+    // Create alert for HIGH/LOW severity
+    if (this._lastResult.status === 'HIGH') {
+      await Alerts.create({
+        sessionId: saved?.id, patientName, bpm: this._lastResult.bpm, severity: 'HIGH',
+        message: `Tachycardia detected — BPM: ${this._lastResult.bpm}. Immediate physician evaluation required.`
+      });
+      await Timeline.add(saved?.id, 'ALERT', `HIGH alert created for ${patientName}`);
+      await this.refreshAlertBadge();
+    } else if (this._lastResult.status === 'LOW') {
+      await Alerts.create({
+        sessionId: saved?.id, patientName, bpm: this._lastResult.bpm, severity: 'MEDIUM',
+        message: `Bradycardia detected — BPM: ${this._lastResult.bpm}. Physician evaluation recommended.`
+      });
+      await this.refreshAlertBadge();
+    }
 
     await this.renderSessionsTable();
     await this.refreshSidebarStats();
@@ -514,12 +614,80 @@ const app = {
   },
 
   async refreshSidebarStats() {
-    const all    = await Sessions.all();
-    const today  = new Date().toDateString();
-    const tod    = all.filter(s => new Date(s.ts).toDateString() === today);
-
+    const all   = await Sessions.all();
+    const today = new Date().toDateString();
+    const tod   = all.filter(s => new Date(s.ts).toDateString() === today);
     document.getElementById('sidebarSessions').textContent = tod.length;
     document.getElementById('sidebarCritical').textContent = tod.filter(s => s.status === 'HIGH').length;
+  },
+
+  async refreshAlertBadge() {
+    const alerts  = await Alerts.all();
+    const pending = alerts.filter(a => a.status === 'pending').length;
+    const badge   = document.getElementById('alertBadge');
+    const sidebar = document.getElementById('sidebarAlerts');
+    if (badge)   { badge.textContent = pending; badge.style.display = pending > 0 ? 'inline-block' : 'none'; }
+    if (sidebar) sidebar.textContent = pending;
+  },
+
+  async renderTimelinePage() {
+    const events = await Timeline.all();
+    const el     = document.getElementById('timelineList');
+    if (!events.length) { el.innerHTML = '<div class="tl-empty">No timeline events yet. Complete a triage scan to generate entries.</div>'; return; }
+    el.innerHTML = events.map(e => `
+      <div class="tl-item">
+        <div class="tl-dot ${e.type}"></div>
+        <div class="tl-content">
+          <div class="tl-type">${esc(e.type)}</div>
+          <div class="tl-note">${esc(e.note)}</div>
+          <div class="tl-time">${fmtDateTime(e.ts)}</div>
+        </div>
+      </div>`).join('');
+  },
+
+  async renderAlertsPage() {
+    const alerts = await Alerts.all();
+    const el     = document.getElementById('alertsList');
+    if (!alerts.length) { el.innerHTML = '<div class="alerts-empty">No alerts yet. HIGH or LOW triage results will appear here.</div>'; return; }
+    el.innerHTML = alerts.map(a => `
+      <div class="alert-item ${a.severity}">
+        <div class="alert-sev ${a.severity}">${esc(a.severity)}</div>
+        <div class="alert-body">
+          <div class="alert-msg">${esc(a.message)}</div>
+          <div class="alert-meta">${esc(a.patientName)} &bull; BPM: ${a.bpm} &bull; ${fmtDateTime(a.ts)} &bull; Retries: ${a.retries}</div>
+        </div>
+        <div class="alert-actions">
+          <div class="alert-status-badge ${a.status}">${a.status.toUpperCase()}</div>
+          ${a.status === 'pending' ? `<button class="alert-ack-btn" onclick="app.acknowledgeAlert(${a.id})">ACKNOWLEDGE</button>` : ''}
+          ${a.status === 'acknowledged' ? `<button class="alert-ack-btn" onclick="app.resolveAlert(${a.id})">RESOLVE</button>` : ''}
+        </div>
+      </div>`).join('');
+  },
+
+  async acknowledgeAlert(id) {
+    await Alerts.patch(id, { status: 'acknowledged' });
+    await this.renderAlertsPage();
+    await this.refreshAlertBadge();
+  },
+
+  async resolveAlert(id) {
+    await Alerts.patch(id, { status: 'resolved' });
+    await this.renderAlertsPage();
+    await this.refreshAlertBadge();
+  },
+
+  async exportFHIR() {
+    try {
+      const r    = await fetch('/api/fhir/Bundle');
+      const data = await r.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a    = Object.assign(document.createElement('a'), {
+        href:     URL.createObjectURL(blob),
+        download: `codecure_fhir_${new Date().toISOString().slice(0, 10)}.json`
+      });
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch { alert('FHIR export failed — ensure server is running'); }
   },
 
   /* Called from refresh button on dashboard page — proxied to _doRefresh */

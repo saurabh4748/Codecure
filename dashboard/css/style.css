@@ -554,6 +554,118 @@ select option { background: var(--bg-card); }
   .stats-row    { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ===================== VALIDATION BANNER ===================== */
+.validation-banner {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--danger-dim);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  margin-bottom: 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--danger);
+  letter-spacing: 1px;
+}
+
+/* ===================== RISK SCORE ===================== */
+.risk-score-wrap { margin-top: 14px; }
+.risk-score-label { font-family: var(--mono); font-size: 9px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 6px; }
+.risk-score-track { height: 6px; background: var(--bg-deep); border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+.risk-score-fill  { height: 100%; border-radius: 3px; transition: width .6s ease; }
+.risk-score-val   { font-family: var(--mono); font-size: 13px; font-weight: bold; }
+
+/* ===================== ALERT NAV BADGE ===================== */
+.alert-nav-badge {
+  display: inline-block;
+  background: var(--danger);
+  color: white;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  vertical-align: middle;
+}
+
+/* ===================== TIMELINE ===================== */
+.timeline-list { padding: 14px; display: flex; flex-direction: column; gap: 0; }
+
+.tl-item {
+  display: flex;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.tl-item:last-child { border-bottom: none; }
+
+.tl-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+  background: var(--accent);
+}
+.tl-dot.SCAN  { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.tl-dot.ALERT { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+.tl-dot.NOTE  { background: var(--text-dim); }
+
+.tl-content { flex: 1; }
+.tl-type  { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--text-dim); margin-bottom: 3px; }
+.tl-note  { font-size: 13px; color: var(--text-hi); }
+.tl-time  { font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 3px; }
+.tl-empty { text-align: center; font-family: var(--mono); font-size: 12px; color: var(--text-dim); padding: 40px; }
+
+/* ===================== ALERTS LIST ===================== */
+.alerts-list { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-deep);
+}
+.alert-item.HIGH   { border-color: var(--danger);  background: var(--danger-dim); }
+.alert-item.MEDIUM { border-color: var(--warning); background: var(--warning-dim); }
+
+.alert-sev {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+.alert-sev.HIGH   { color: var(--danger);  border-color: var(--danger); }
+.alert-sev.MEDIUM { color: var(--warning); border-color: var(--warning); }
+
+.alert-body { flex: 1; }
+.alert-msg  { font-size: 13px; color: var(--text-hi); margin-bottom: 4px; }
+.alert-meta { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+
+.alert-actions { display: flex; flex-direction: column; gap: 5px; }
+.alert-status-badge {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+  padding: 3px 8px; border-radius: 3px; text-align: center;
+}
+.alert-status-badge.pending      { background: var(--warning-dim); color: var(--warning); }
+.alert-status-badge.acknowledged { background: var(--accent-dim);  color: var(--accent); }
+.alert-status-badge.resolved     { background: var(--success-dim); color: var(--success); }
+
+.alert-ack-btn {
+  background: transparent; border: 1px solid var(--accent); color: var(--accent);
+  font-family: var(--mono); font-size: 9px; padding: 3px 8px; border-radius: 3px;
+  cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.alert-ack-btn:hover { background: var(--accent); color: var(--bg-deep); }
+
+.alerts-empty { text-align: center; font-family: var(--mono); font-size: 12px; color: var(--text-dim); padding: 40px; }
+
 @media (max-width: 800px) {
   .sidebar   { display: none; }
   .charts-grid { grid-template-columns: 1fr; }
