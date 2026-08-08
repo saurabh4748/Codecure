@@ -50,6 +50,9 @@
         <button class="nav-btn" data-page="alerts" onclick="app.navigate('alerts')">
           <span>🔔</span><span>Alerts&nbsp;<span class="alert-nav-badge" id="alertBadge" style="display:none">0</span></span>
         </button>
+        <button class="nav-btn" data-page="incidents" onclick="app.navigate('incidents')">
+          <span>🚨</span><span>Incidents</span>
+        </button>
         <button class="nav-btn" data-page="howitworks" onclick="app.navigate('howitworks')">
           <span>⚙</span><span>How It Works</span>
         </button>
@@ -318,6 +321,95 @@
         <div class="card">
           <div class="card-header">ACTIVE ALERTS <button class="refresh-btn" onclick="app.renderAlertsPage()">↻ REFRESH</button></div>
           <div id="alertsList" class="alerts-list"></div>
+        </div>
+      </section>
+
+      <!-- ========== PAGE: INCIDENTS ========== -->
+      <section class="page" id="page-incidents">
+        <div class="page-header">
+          <h2>INCIDENT OPERATIONS CENTRE</h2>
+          <p>Live incident queue, resource dispatch, and response tracking</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="inc-filter-bar">
+          <input type="text" id="incSearch" placeholder="Search incident or patient..." oninput="app.filterIncidents()">
+          <select id="incSeverity" onchange="app.filterIncidents()">
+            <option value="">All Severities</option>
+            <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+          </select>
+          <select id="incLocation" onchange="app.filterIncidents()">
+            <option value="">All Locations</option>
+            <option>Patiala</option><option>Ludhiana</option><option>Amritsar</option>
+            <option>Chandigarh</option><option>Jalandhar</option>
+          </select>
+          <select id="incResourceType" onchange="app.filterIncidents()">
+            <option value="">All Resources</option>
+            <option>Ambulance</option><option>EMT</option><option>ICU Team</option><option>Transport</option>
+          </select>
+          <select id="incStatus" onchange="app.filterIncidents()">
+            <option value="">All Statuses</option>
+            <option>PENDING</option><option>DISPATCHED</option><option>CONTACTED</option>
+            <option>ESCALATED</option><option>RESOLVED</option>
+          </select>
+          <select id="incHospital" onchange="app.filterIncidents()">
+            <option value="">All Hospitals</option>
+            <option>AVAILABLE</option><option>FULL</option>
+          </select>
+          <button class="btn btn-secondary" onclick="app.resetIncidentFilters()">↺ RESET</button>
+          <button class="btn btn-secondary" onclick="app.seedDemoIncidents()">⬛ SEED DEMO</button>
+        </div>
+
+        <div class="inc-layout">
+
+          <!-- Map -->
+          <div class="card inc-map-card">
+            <div class="card-header">INCIDENT MAP &mdash; PUNJAB REGION <span id="incMapCount" class="inc-map-count">0 active</span></div>
+            <div class="inc-map" id="incMap">
+              <svg viewBox="0 0 500 360" class="inc-map-svg" id="incMapSvg">
+                <!-- Punjab outline (simplified) -->
+                <path class="inc-region" d="M80,60 L200,30 L340,50 L420,100 L430,200 L380,290 L260,320 L120,300 L60,220 Z"/>
+                <!-- City dots -->
+                <g id="cityMarkers">
+                  <circle class="city-dot" cx="200" cy="180" r="5"/><text class="city-lbl" x="210" y="184">Patiala</text>
+                  <circle class="city-dot" cx="155" cy="130" r="5"/><text class="city-lbl" x="165" y="134">Ludhiana</text>
+                  <circle class="city-dot" cx="105" cy="115" r="5"/><text class="city-lbl" x="115" y="119">Amritsar</text>
+                  <circle class="city-dot" cx="270" cy="100" r="5"/><text class="city-lbl" x="280" y="104">Chandigarh</text>
+                  <circle class="city-dot" cx="135" cy="175" r="5"/><text class="city-lbl" x="145" y="179">Jalandhar</text>
+                </g>
+                <!-- Incident markers injected by JS -->
+                <g id="incidentMarkers"></g>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Detail Panel -->
+          <div class="card inc-detail-card" id="incDetailCard">
+            <div class="card-header">INCIDENT DETAIL</div>
+            <div id="incDetailBody" class="inc-detail-body">
+              <div class="inc-detail-empty">Select an incident from the queue to view details</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Queue Table -->
+        <div class="card">
+          <div class="card-header">INCIDENT QUEUE <span id="incQueueCount" class="inc-map-count">0 incidents</span>
+            <button class="refresh-btn" onclick="app.renderIncidentsPage()">&#8635; REFRESH</button>
+          </div>
+          <div style="overflow-x:auto">
+          <table class="sessions-table">
+            <thead><tr>
+              <th>INCIDENT</th><th>SEVERITY</th><th>PATIENT</th><th>LOCATION</th>
+              <th>RESOURCE</th><th>HOSPITAL</th><th>AVAIL.</th>
+              <th>STATUS</th><th>PROGRESS</th><th>BRIEF</th>
+            </tr></thead>
+            <tbody id="incQueueBody">
+              <tr class="empty-row"><td colspan="10">No incidents. Click SEED DEMO to populate.</td></tr>
+            </tbody>
+          </table>
+          </div>
         </div>
       </section>
 

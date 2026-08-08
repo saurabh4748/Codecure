@@ -31,7 +31,11 @@ app.get('/api/sessions', (_req, res) => {
 
 // POST new session
 app.post('/api/sessions', (req, res) => {
-  const { name, age, gender, blood, bpm, status, complaint, history } = req.body;
+  const {
+    name, age, gender, blood, bpm, status, complaint, history,
+    incidentId, severity, location, resourceType, assignedResource,
+    resourceId, hospital, hospitalAvailability, incidentStatus, routeNotes
+  } = req.body;
   if (!name || !bpm || !status) return res.status(400).json({ error: 'name, bpm, status required' });
 
   const sessions = load();
@@ -40,12 +44,34 @@ app.post('/api/sessions', (req, res) => {
     id: nextId,
     ts: new Date().toISOString(),
     name, age: age ?? '--', gender: gender ?? '--', blood: blood ?? '--',
-    bpm, status, complaint: complaint ?? '--', history: history ?? '--'
+    bpm, status, complaint: complaint ?? '--', history: history ?? '--',
+    incidentId: incidentId ?? `INC-${String(nextId).padStart(3,'0')}`,
+    severity: severity ?? status,
+    location: location ?? '--',
+    resourceType: resourceType ?? '--',
+    assignedResource: assignedResource ?? '--',
+    resourceId: resourceId ?? '--',
+    hospital: hospital ?? '--',
+    hospitalAvailability: hospitalAvailability ?? '--',
+    incidentStatus: incidentStatus ?? 'PENDING',
+    routeNotes: routeNotes ?? '--'
   };
 
   sessions.unshift(entry);
   save(sessions);
   res.status(201).json({ id: entry.id, ts: entry.ts });
+});
+
+// PATCH incident fields for a session
+app.patch('/api/sessions/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const sessions = load();
+  const idx = sessions.findIndex(s => s.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'not found' });
+  const allowed = ['incidentStatus','severity','location','resourceType','assignedResource','resourceId','hospital','hospitalAvailability','routeNotes'];
+  allowed.forEach(k => { if (req.body[k] !== undefined) sessions[idx][k] = req.body[k]; });
+  save(sessions);
+  res.json(sessions[idx]);
 });
 
 // DELETE one session

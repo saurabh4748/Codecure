@@ -292,6 +292,7 @@ const app = {
     document.querySelector(`[data-page="${page}"]`).classList.add('active');
     if (page === 'timeline')   this.renderTimelinePage();
     if (page === 'alerts')     this.renderAlertsPage();
+    if (page === 'incidents')  this.renderIncidentsPage();
   },
 
   /* ---- ThingSpeak API ---- */
@@ -740,6 +741,7 @@ const app = {
     panel.querySelectorAll('.checklist-item').forEach(item => {
       item.classList.toggle('done', item.querySelector('input[type=checkbox]').checked);
     });
+    await Timeline.add(sessionId, key.toUpperCase(), `${key.charAt(0).toUpperCase()+key.slice(1)} step ${checked ? 'completed' : 'unchecked'}`);
   },
 
   async exportBrief(sessionId) {
@@ -764,24 +766,38 @@ const app = {
     const checkLines = CHECKLIST_STEPS.map(st => `  [${cl[st.key] ? 'x' : ' '}] ${st.label}`).join('\n');
     const sep = '='.repeat(46);
     const div = '-'.repeat(25);
+    const done = CHECKLIST_STEPS.filter(st => cl[st.key]).length;
+    const pct  = Math.round((done / CHECKLIST_STEPS.length) * 100);
     const brief = [
-      'CODECURE — INCIDENT RESPONSE BRIEF',
+      'CODECURE RESPONSE SUMMARY',
       sep,
       `Generated : ${new Date().toLocaleString('en-IN')}`,
       '',
-      'PATIENT INFORMATION', div,
+      'INCIDENT', div,
+      `ID        : ${s.incidentId ?? '--'}`,
+      `Severity  : ${s.severity   ?? '--'}`,
+      `Priority  : ${info.priority}`,
+      `Status    : ${s.incidentStatus ?? '--'}`,
+      '',
+      'PATIENT', div,
       `Name      : ${s.name}`,
       `Age       : ${s.age}   |   Gender : ${s.gender}   |   Blood : ${s.blood}`,
-      `Recorded  : ${fmtDateTime(s.ts)}`,
+      `BPM       : ${s.bpm}   |   Vitals : ${s.status}`,
+      `Complaint : ${s.complaint}`,
+      `History   : ${s.history}`,
       '',
-      'VITAL SIGNS', div,
-      `BPM       : ${s.bpm}   |   Status : ${s.status}   |   Priority : ${info.priority}`,
+      'LOCATION', div,
+      `  ${s.location ?? '--'}`,
+      `Route     : ${s.routeNotes ?? '--'}`,
       '',
-      'CHIEF COMPLAINT', div,
-      `  ${s.complaint}`,
+      'ASSIGNED RESOURCES', div,
+      `Type      : ${s.resourceType      ?? '--'}`,
+      `Unit      : ${s.assignedResource  ?? '--'}`,
+      `ID        : ${s.resourceId        ?? '--'}`,
       '',
-      'KNOWN CONDITIONS / MEDICATIONS', div,
-      `  ${s.history}`,
+      'HOSPITAL', div,
+      `  ${s.hospital              ?? '--'}`,
+      `Availability : ${s.hospitalAvailability ?? '--'}`,
       '',
       'RISK ASSESSMENT', div,
       `Score     : ${score}/100   |   ${risk.label}`,
@@ -789,7 +805,10 @@ const app = {
       'RESPONSE CHECKLIST', div,
       checkLines,
       '',
-      'INCIDENT TIMELINE', div,
+      'PROGRESS', div,
+      `  ${done} / ${CHECKLIST_STEPS.length} — ${pct}%`,
+      '',
+      'STATUS TIMELINE', div,
       tlLines,
       '',
       'RECOMMENDATIONS', div,
@@ -832,6 +851,208 @@ const app = {
       await Timeline.add(saved.id, 'RESOLUTION', 'Patient stabilized and admitted to ICU');
     }
     await this.renderSessionsTable();
+    await this.refreshSidebarStats();
+  },
+
+  /* ---- Incidents ---- */
+  async renderIncidentsPage() {
+    let list = await Sessions.all();
+
+    const search   = (document.getElementById('incSearch')?.value   ?? '').toLowerCase();
+    const sev      = document.getElementById('incSeverity')?.value  ?? '';
+    const loc      = document.getElementById('incLocation')?.value  ?? '';
+    const res      = document.getElementById('incResourceType')?.value ?? '';
+    const stat     = document.getElementById('incStatus')?.value    ?? '';
+    const hosp     = document.getElementById('incHospital')?.value  ?? '';
+
+    if (search) list = list.filter(s =>
+      s.name.toLowerCase().includes(search) ||
+      (s.incidentId ?? '').toLowerCase().includes(search) ||
+      (s.location   ?? '').toLowerCase().includes(search));
+    if (sev)  list = list.filter(s => (s.severity        ?? '').toUpperCase() === sev);
+    if (loc)  list = list.filter(s => (s.location        ?? '') === loc);
+    if (res)  list = list.filter(s => (s.resourceType    ?? '') === res);
+    if (stat) list = list.filter(s => (s.incidentStatus  ?? '') === stat);
+    if (hosp) list = list.filter(s => (s.hospitalAvailability ?? '') === hosp);
+
+    const SEV_COLOR = { CRITICAL: 'var(--danger)', HIGH: '#ff8800', MEDIUM: 'var(--warning)', LOW: 'var(--success)' };
+
+    document.getElementById('incQueueCount').textContent = `${list.length} incident${list.length !== 1 ? 's' : ''}`;
+    document.getElementById('incMapCount').textContent   = `${list.length} active`;
+
+    const tbody = document.getElementById('incQueueBody');
+    if (!list.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No incidents match current filters.</td></tr>';
+      this._renderMapMarkers([]);
+      return;
+    }
+
+    tbody.innerHTML = list.map(s => {
+      const cl    = s.checklist ?? {};
+      const done  = CHECKLIST_STEPS.filter(st => cl[st.key]).length;
+      const total = CHECKLIST_STEPS.length;
+      const progColor = done === total ? 'var(--success)' : done > 0 ? 'var(--warning)' : 'var(--text-dim)';
+      const sevColor  = SEV_COLOR[s.severity] ?? 'var(--text-dim)';
+      const statClass = { PENDING:'', DISPATCHED:'badge NORMAL', CONTACTED:'badge NORMAL', ESCALATED:'badge LOW', RESOLVED:'badge HIGH' }[s.incidentStatus] ?? '';
+      return `<tr class="inc-queue-row" onclick="app.showIncidentDetail(${s.id})">
+        <td style="font-family:var(--mono);color:var(--accent)">${esc(s.incidentId ?? '--')}</td>
+        <td style="font-family:var(--mono);font-weight:bold;color:${sevColor}">${esc(s.severity ?? '--')}</td>
+        <td><strong>${esc(s.name)}</strong></td>
+        <td style="font-family:var(--mono);font-size:11px">${esc(s.location ?? '--')}</td>
+        <td style="font-family:var(--mono);font-size:11px">${esc(s.resourceType ?? '--')}</td>
+        <td style="font-family:var(--mono);font-size:11px">${esc(s.hospital ?? '--')}</td>
+        <td><span class="avail-badge ${(s.hospitalAvailability ?? '')}">${esc(s.hospitalAvailability ?? '--')}</span></td>
+        <td><span class="inc-stat-badge ${(s.incidentStatus ?? '')}">${esc(s.incidentStatus ?? '--')}</span></td>
+        <td><button class="checklist-prog-btn" style="color:${progColor}">${done}/${total}</button></td>
+        <td><button class="brief-btn" onclick="event.stopPropagation();app.exportBrief(${s.id})" title="Download response brief">📄</button></td>
+      </tr>`;
+    }).join('');
+
+    this._renderMapMarkers(list);
+  },
+
+  filterIncidents() { this.renderIncidentsPage(); },
+
+  resetIncidentFilters() {
+    ['incSearch','incSeverity','incLocation','incResourceType','incStatus','incHospital']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    this.renderIncidentsPage();
+  },
+
+  _cityCoords: {
+    Patiala: { cx: 200, cy: 180 }, Ludhiana: { cx: 155, cy: 130 },
+    Amritsar: { cx: 105, cy: 115 }, Chandigarh: { cx: 270, cy: 100 }, Jalandhar: { cx: 135, cy: 175 }
+  },
+
+  _renderMapMarkers(list) {
+    const g = document.getElementById('incidentMarkers');
+    if (!g) return;
+    const SEV_COL = { CRITICAL: '#ff4466', HIGH: '#ff8800', MEDIUM: '#ffaa00', LOW: '#00ff88' };
+    const grouped = {};
+    list.forEach(s => {
+      const loc = s.location ?? 'Unknown';
+      if (!grouped[loc]) grouped[loc] = [];
+      grouped[loc].push(s);
+    });
+    g.innerHTML = Object.entries(grouped).map(([loc, incidents]) => {
+      const coord = this._cityCoords[loc];
+      if (!coord) return '';
+      const col  = SEV_COL[incidents[0].severity] ?? '#5a7090';
+      const pulse = incidents.some(i => i.incidentStatus !== 'RESOLVED');
+      return `
+        <circle class="inc-marker${pulse ? ' pulse' : ''}" cx="${coord.cx}" cy="${coord.cy}" r="12"
+          fill="${col}33" stroke="${col}" stroke-width="2"
+          onclick="app.showIncidentDetail(${incidents[0].id})" style="cursor:pointer"/>
+        <text class="inc-marker-count" x="${coord.cx}" y="${coord.cy + 4}" text-anchor="middle"
+          fill="${col}" font-size="10" font-family="Share Tech Mono,monospace"
+          onclick="app.showIncidentDetail(${incidents[0].id})" style="cursor:pointer">${incidents.length}</text>`;
+    }).join('');
+  },
+
+  async showIncidentDetail(sessionId) {
+    const sessions = await Sessions.all();
+    const s = sessions.find(x => x.id === sessionId);
+    if (!s) return;
+    const cl   = s.checklist ?? {};
+    const done = CHECKLIST_STEPS.filter(st => cl[st.key]).length;
+    const pct  = Math.round((done / CHECKLIST_STEPS.length) * 100);
+    const SEV_COLOR = { CRITICAL: 'var(--danger)', HIGH: '#ff8800', MEDIUM: 'var(--warning)', LOW: 'var(--success)' };
+    const sevColor  = SEV_COLOR[s.severity] ?? 'var(--text-dim)';
+    const steps = CHECKLIST_STEPS.map(step => `
+      <label class="checklist-item${cl[step.key] ? ' done' : ''}">
+        <input type="checkbox"${cl[step.key] ? ' checked' : ''} onchange="app.patchChecklistFromIncident(${s.id},'${step.key}',this.checked)">
+        <span>${step.label}</span>
+      </label>`).join('');
+
+    document.getElementById('incDetailBody').innerHTML = `
+      <div class="inc-detail-grid">
+        <div class="inc-detail-row"><span class="inc-detail-lbl">INCIDENT ID</span><span class="inc-detail-val" style="color:var(--accent)">${esc(s.incidentId ?? '--')}</span></div>
+        <div class="inc-detail-row"><span class="inc-detail-lbl">SEVERITY</span><span class="inc-detail-val" style="color:${sevColor};font-weight:bold">${esc(s.severity ?? '--')}</span></div>
+        <div class="inc-detail-row"><span class="inc-detail-lbl">STATUS</span><span class="inc-stat-badge ${s.incidentStatus}">${esc(s.incidentStatus ?? '--')}</span></div>
+        <div class="inc-detail-row"><span class="inc-detail-lbl">PATIENT</span><span class="inc-detail-val">${esc(s.name)}</span></div>
+        <div class="inc-detail-row"><span class="inc-detail-lbl">BPM / VITALS</span><span class="inc-detail-val" style="color:var(--accent)">${s.bpm} BPM — ${s.status}</span></div>
+        <div class="inc-detail-row"><span class="inc-detail-lbl">LOCATION</span><span class="inc-detail-val">${esc(s.location ?? '--')}</span></div>
+        <div class="inc-detail-row"><span class="inc-detail-lbl">ROUTE</span><span class="inc-detail-val">${esc(s.routeNotes ?? '--')}</span></div>
+        <div class="inc-detail-row"><span class="inc-detail-lbl">RESOURCE TYPE</span><span class="inc-detail-val">${esc(s.resourceType ?? '--')}</span></div>
+        <div class="inc-detail-row"><span class="inc-detail-lbl">ASSIGNED</span><span class="inc-detail-val">${esc(s.assignedResource ?? '--')} ${s.resourceId && s.resourceId !== '--' ? '(' + esc(s.resourceId) + ')' : ''}</span></div>
+        <div class="inc-detail-row"><span class="inc-detail-lbl">HOSPITAL</span><span class="inc-detail-val">${esc(s.hospital ?? '--')}</span></div>
+        <div class="inc-detail-row"><span class="inc-detail-lbl">AVAILABILITY</span><span class="avail-badge ${s.hospitalAvailability}">${esc(s.hospitalAvailability ?? '--')}</span></div>
+      </div>
+      <div class="inc-detail-section">RESPONSE CHECKLIST</div>
+      <div class="checklist-panel" style="flex-direction:column;gap:6px">${steps}</div>
+      <div class="inc-progress-bar-wrap">
+        <div class="inc-progress-label">${done} / ${CHECKLIST_STEPS.length} steps &mdash; ${pct}%</div>
+        <div class="inc-progress-track"><div class="inc-progress-fill" style="width:${pct}%;background:${pct===100?'var(--success)':pct>0?'var(--warning)':'var(--text-dim)'}"></div></div>
+      </div>
+      <div style="padding:12px 16px 4px">
+        <button class="btn btn-secondary" style="width:100%;font-size:12px" onclick="app.exportBrief(${s.id})">📄 EXPORT RESPONSE SUMMARY</button>
+      </div>`;
+  },
+
+  async patchChecklistFromIncident(sessionId, key, checked) {
+    await this.patchChecklist(sessionId, key, checked);
+    await Timeline.add(sessionId, key.toUpperCase(), `${key.charAt(0).toUpperCase()+key.slice(1)} step ${checked ? 'completed' : 'unchecked'}`);
+    await this.showIncidentDetail(sessionId);
+    await this.renderIncidentsPage();
+  },
+
+  async seedDemoIncidents() {
+    const demos = [
+      { name: 'Ravi Kumar',   age: '58', gender: 'Male',   blood: 'O+',  bpm: 118, status: 'HIGH',
+        complaint: 'Chest tightness, shortness of breath', history: 'Hypertension, Aspirin',
+        severity: 'CRITICAL', location: 'Patiala',     resourceType: 'Ambulance',  assignedResource: 'Ambulance', resourceId: 'AMB-12',
+        hospital: 'Rajindra Hospital', hospitalAvailability: 'AVAILABLE', incidentStatus: 'DISPATCHED',
+        routeNotes: 'NH44 → Rajindra Hospital',
+        checklist: { dispatch: true, contact: true, escalation: true, resolution: false },
+        timeline: ['SCAN:BPM: 118 | Status: HIGH', 'DISPATCH:Ambulance AMB-12 dispatched', 'CONTACT:Family contacted', 'ESCALATION:Dr. Sharma (Cardiology) notified']
+      },
+      { name: 'Priya Kaur',   age: '42', gender: 'Female', blood: 'B+',  bpm: 112, status: 'HIGH',
+        complaint: 'Palpitations, dizziness', history: 'Diabetes',
+        severity: 'HIGH', location: 'Ludhiana',    resourceType: 'EMT',         assignedResource: 'EMT Unit',  resourceId: 'EMT-07',
+        hospital: 'DMC Ludhiana', hospitalAvailability: 'AVAILABLE', incidentStatus: 'CONTACTED',
+        routeNotes: 'GT Road → DMC Ludhiana',
+        checklist: { dispatch: true, contact: true, escalation: false, resolution: false },
+        timeline: ['SCAN:BPM: 112 | Status: HIGH', 'DISPATCH:EMT-07 dispatched', 'CONTACT:Patient contacted']
+      },
+      { name: 'Gurpreet Singh', age: '67', gender: 'Male', blood: 'A-', bpm: 108, status: 'HIGH',
+        complaint: 'Syncope episode, chest pain', history: 'Cardiac history, Warfarin',
+        severity: 'MEDIUM', location: 'Amritsar',   resourceType: 'ICU Team',    assignedResource: 'ICU Response', resourceId: 'ICU-03',
+        hospital: 'GMCH Amritsar', hospitalAvailability: 'FULL', incidentStatus: 'ESCALATED',
+        routeNotes: 'Inner Ring Road → GMCH Amritsar',
+        checklist: { dispatch: true, contact: true, escalation: true, resolution: false },
+        timeline: ['SCAN:BPM: 108 | Status: HIGH', 'DISPATCH:ICU team dispatched', 'ESCALATION:Senior cardiologist alerted — hospital full']
+      },
+      { name: 'Anjali Sharma', age: '35', gender: 'Female', blood: 'AB+', bpm: 105, status: 'HIGH',
+        complaint: 'Breathlessness post exertion', history: 'Asthma',
+        severity: 'HIGH', location: 'Chandigarh', resourceType: 'Ambulance',  assignedResource: 'Ambulance', resourceId: 'AMB-05',
+        hospital: 'PGI Chandigarh', hospitalAvailability: 'AVAILABLE', incidentStatus: 'DISPATCHED',
+        routeNotes: 'Sector 12 → PGI Chandigarh',
+        checklist: { dispatch: true, contact: false, escalation: false, resolution: false },
+        timeline: ['SCAN:BPM: 105 | Status: HIGH', 'DISPATCH:Ambulance AMB-05 dispatched']
+      },
+      { name: 'Harjot Singh',  age: '29', gender: 'Male',   blood: 'O-',  bpm: 52, status: 'LOW',
+        complaint: 'Fatigue, slow pulse', history: 'None',
+        severity: 'LOW', location: 'Jalandhar', resourceType: 'Transport',   assignedResource: 'Patient Transport', resourceId: 'PT-02',
+        hospital: 'Civil Hospital Jalandhar', hospitalAvailability: 'AVAILABLE', incidentStatus: 'PENDING',
+        routeNotes: 'Model Town → Civil Hospital',
+        checklist: { dispatch: false, contact: false, escalation: false, resolution: false },
+        timeline: ['SCAN:BPM: 52 | Status: LOW']
+      }
+    ];
+
+    for (const d of demos) {
+      const saved = await Sessions.add({ ...d });
+      if (!saved?.id) continue;
+      await fetch(`/api/sessions/${saved.id}/checklist`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(d.checklist)
+      });
+      for (const t of (d.timeline ?? [])) {
+        const [type, ...rest] = t.split(':');
+        await Timeline.add(saved.id, type, rest.join(':'));
+      }
+    }
+    await this.renderIncidentsPage();
     await this.refreshSidebarStats();
   },
 
